@@ -2,7 +2,7 @@ import tsplib95
 import numpy as np
 
 #Return distance matrix from tsplib file
-def load_tsplib_distance_matrix(tsplib_file):
+def load_tsplib_distance_matrix(tsplib_file: str) -> np.ndarray:
     tsp_problem_instance = tsplib95.load(tsplib_file)
 
     # Creates array containing distances between all pairs of cities in tsp problem

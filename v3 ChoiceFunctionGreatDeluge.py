@@ -17,6 +17,9 @@ class ProblemDomain:
             total_distance += self.distance_matrix[solution[i-1]][solution[i]]
         return total_distance
     
+    def getDistance(self, city1, city2):
+        return self.distance_matrix[city1][city2]
+    
     def initialiseSolution(self, index):
         self.solution = list(range(self.num_cities))
         random.shuffle(self.solution)
@@ -27,23 +30,70 @@ class ProblemDomain:
         return self.calculateTotalDistance(self.solution)
     
     def applyHeuristic(self, heuristic_index, current_index, new_index):
-        solution_copy = self.solution.copy()
+        # Returns the solution value 
+        #solution_copy = self.solution.copy()
         if heuristic_index == 0:
-            new_solution = self.swapHeursitic(solution_copy)
+            new_solution = self.swapHeursitic(self.solution)
         elif heuristic_index == 1:
-            new_solution = self.two_OptHeursitic(solution_copy)
+            new_solution = self.inversionHeursitic(self.solution)
         elif heuristic_index == 2:
-            new_solution = self.reverse_subtour_operator(solution_copy)
+            new_solution = self.scramble_subtourHeuristic(self.solution)
         elif heuristic_index == 3:
-            new_solution = self.scramble_subtour_operator(solution_copy)
+            new_solution = self.insertHeursitic(self.solution)
+        elif heuristic_index == 4:
+            new_solution = self.displacementHeuristic(self.solution)
+        elif heuristic_index == 5:
+            new_solution = self.two_OptHeursitic(self.solution)
+        elif heuristic_index == 6:
+            new_solution = self.nearest_neighbor_local_search(self.solution)
+        elif heuristic_index == 7:
+            new_solution = self.order_crossover(self.solution)
+        elif heuristic_index == 8:
+            new_solution = self.pmx_crossover(self.solution)
+        elif heuristic_index == 9:
+            new_solution = self.pbx_crossover(self.solution)
+        elif heuristic_index == 10:
+            new_solution = self.oneX_crossover(self.solution)
+        elif heuristic_index == 11:
+            new_solution = self.ruin_recreate_operator(self.solution)
         #need multi solution tsp
     
         return self.calculateTotalDistance(new_solution)
     
+    def applyHeuristicSolution(self, heuristic_index, solution):
+        #solution_copy = self.solution.copy()
+        if heuristic_index == 0:
+            new_solution = self.swapHeursitic(solution)
+        elif heuristic_index == 1:
+            new_solution = self.inversionHeursitic(solution)
+        elif heuristic_index == 2:
+            new_solution = self.scramble_subtourHeuristic(solution)
+        elif heuristic_index == 3:
+            new_solution = self.insertHeursitic(solution)
+        elif heuristic_index == 4:
+            new_solution = self.displacementHeuristic(solution)
+        elif heuristic_index == 5:
+            new_solution = self.two_OptHeursitic(solution)
+        elif heuristic_index == 6:
+            new_solution = self.nearest_neighbor_local_search(solution)
+        elif heuristic_index == 7:
+            new_solution = self.order_crossover(solution)
+        elif heuristic_index == 8:
+            new_solution = self.pmx_crossover(solution)
+        elif heuristic_index == 9:
+            new_solution = self.pbx_crossover(solution)
+        elif heuristic_index == 10:
+            new_solution = self.oneX_crossover(solution)
+        elif heuristic_index == 11:
+            new_solution = self.ruin_recreate_operator(solution)
+
+        return new_solution
+    
     def getNumberOfHeuristics(self):
         return len(self.getHeursiticsOfType("LOCAL_SEARCH")) + \
             len(self.getHeursiticsOfType("CROSSOVER")) + \
-            len(self.getHeursiticsOfType("MUTATION"))
+            len(self.getHeursiticsOfType("MUTATION")) + \
+            len(self.getHeursiticsOfType("RUIN_RECREATE"))
     
     def getBestSolution(self):
         return self.best_solution
@@ -52,37 +102,209 @@ class ProblemDomain:
         return self.best_solution_value
     
     def getHeursiticsOfType(self, heuristicType):
-        if heuristicType == "LOCAL_SEARCH":
-            return [0, 1, 2, 3]
+        if heuristicType == "MUTATION":
+            return [0, 1, 2, 3, 4]
+        elif heuristicType == "LOCAL_SEARCH":
+            return [5, 6]
         elif heuristicType == "CROSSOVER":
-            return []
-        elif heuristicType == "MUTATION":
-            return []
+            return [7, 8, 9, 10]
+        elif heuristicType == "RUIN_RECREATE":
+            return [11]
         return []
     
-    ### Local Search Heuristics ###
+    def getHeuristics(self):
+        return self.getHeursiticsOfType("LOCAL_SEARCH") + \
+            self.getHeursiticsOfType("CROSSOVER") + \
+            self.getHeursiticsOfType("MUTATION") + \
+            self.getHeursiticsOfType("RUIN_RECREATE")
+
+    ### Mutation Operators ###
     def swapHeursitic(self, solution):  #0
         i, j = random.sample(range(len(solution)), 2)
-        solution[i], solution[j] = solution[j], solution[i]
-        return solution
+        new_solution = solution.copy()
+        new_solution[i], new_solution[j] = new_solution[j], new_solution[i]
+        return new_solution
     
-    def two_OptHeursitic(self, solution):   #1
+    def inversionHeursitic(self, solution):  #1
         i, j = sorted(random.sample(range(len(solution)), 2))
-        solution[i:j+1] = reversed(solution[i:j+1])
-        return solution
-    
-    def reverse_subtour_operator(self, solution):   #2
-        i, j = sorted(random.sample(range(len(solution)), 2))
-        solution[i:j] = reversed(solution[i:j])
-        return solution
+        new_solution = solution.copy()
+        new_solution[i:j] = reversed(new_solution[i:j])
+        return new_solution
 
-    def scramble_subtour_operator(self, solution):  #3
+    def scramble_subtourHeuristic(self, solution):  #2
         i, j = sorted(random.sample(range(len(solution)), 2))
-        sublist = solution[i: j]
+        new_solution = solution.copy()
+        sublist = new_solution[i: j]
         random.shuffle(sublist)
-        solution[i:j] = sublist
-        return solution
+        new_solution[i:j] = sublist
+        return new_solution
     
+    def insertHeursitic(self, solution):  #3
+        i, j = sorted(random.sample(range(len(solution)), 2))
+        new_solution = solution.copy()
+        city = new_solution.pop(i)
+        new_solution.insert(j, city)
+        return new_solution
+    
+    def displacementHeuristic(self, solution):  #4
+        i, j = sorted(random.sample(range(len(solution)), 2))
+        new_solution = solution.copy()
+        sublist = new_solution[i: j]
+        new_solution = new_solution[:i] + new_solution[j:]
+        insert_pos = random.randint(0, len(new_solution))
+        new_solution[i:j] = new_solution[:insert_pos] + sublist + new_solution[insert_pos:]
+        return new_solution
+    
+
+    ### Local Search Operators ###
+    def two_OptHeursitic(self, solution):   #5
+        current_solution = solution.copy()
+        current_solution_value = self.calculateTotalDistance(current_solution)
+        
+        while True:
+            improved = False
+            i, j = sorted(random.sample(range(len(solution)), 2))
+            new_solution = solution[:i+1] + solution[i+1:j+1][::-1] + solution[j+1:]
+            new_solution_value = self.calculateTotalDistance(new_solution)
+
+            if new_solution_value < current_solution_value:
+                current_solution = new_solution
+                current_solution_value = new_solution_value
+                improved = True
+            
+            if not improved:
+                break 
+            
+        return current_solution
+        
+    def nearest_neighbor_local_search(self, solution):  #6
+        start = random.choice(solution)
+        unvisited = set(solution)
+        unvisited.remove(start)
+        tour = [start]
+        current = start
+
+        while unvisited:
+            # key function for min(), compares cities based on distace from current city
+            # takes city as input and returns distance between that city and current city
+            next_city = min(unvisited, key = lambda city : self.getDistance(current, city))
+            tour.append(next_city)
+            unvisited.remove(next_city)
+            current = next_city
+        
+        return tour
+
+
+    ### Crossover Operators ###
+    def order_crossover(self, solution, solution2 = None):  #7
+        #order crossover
+        if solution2 == None:
+            heuristicIndex = random.choice([heuristic for heuristic in self.getHeuristics() if heuristic not in self.getHeursiticsOfType("CROSSOVER")])
+            solution2 = self.applyHeuristicSolution(heuristicIndex, solution)
+        solutionCopy = solution.copy()
+        solution2Copy = solution2.copy()
+
+        size = len(solutionCopy)
+        a, b = sorted(random.sample(range(size), 2))
+        child = [None] * size
+        child[a:b] = solutionCopy[a:b]
+        ptr = b     #pointer
+        for city in solution2Copy[b:] + solution2Copy[:b]:
+            if city not in child:
+                if ptr >= size:
+                    ptr = 0
+                child[ptr] = city
+                ptr += 1
+        return child
+
+    def pmx_crossover(self, solution, solution2 = None):    #8
+        #partially mapped crossover
+        if solution2 == None:
+            heuristicIndex = random.choice([heuristic for heuristic in self.getHeuristics() if heuristic not in self.getHeursiticsOfType("CROSSOVER")])
+            solution2 = self.applyHeuristicSolution(heuristicIndex, solution)
+        solutionCopy = solution.copy()
+        solution2Copy = solution2.copy()
+
+        size = len(solutionCopy)
+        a, b = sorted(random.sample(range(size), 2))
+        child = [None] * size
+        child[a:b] = solutionCopy[a:b]
+        for i in range(a, b):
+            if solution2Copy[i] not in child:
+                pos = i
+                while True:
+                    city = solutionCopy[pos]
+                    pos = solution2Copy.index(city)
+                    if child[pos] is None:
+                        child[pos] = solution2Copy[i]
+                        break
+        for i in range(size):
+            if child[i] is None:
+                child[i] = solution2Copy[i]
+        return child
+
+    def pbx_crossover(self, solution, solution2 = None):    #9
+        #position-based mapped crossover
+        if solution2 == None:
+            heuristicIndex = random.choice([heuristic for heuristic in self.getHeuristics() if heuristic not in self.getHeursiticsOfType("CROSSOVER")])
+            solution2 = self.applyHeuristicSolution(heuristicIndex, solution)
+        solutionCopy = solution.copy()
+        solution2Copy = solution2.copy()
+
+        size = len(solutionCopy)
+        child = [None] * size
+        positions = sorted(random.sample(range(size), size // 2))
+        for pos in positions:
+            child[pos] = solutionCopy[pos]
+        ptr = 0
+        for city in solution2Copy:
+            if city not in child:
+                while ptr < size and child[ptr] is not None:
+                    ptr += 1
+                if ptr < size:
+                    child[ptr] = city
+        return child
+
+    def oneX_crossover(self, solution, solution2 = None):   #10
+        #one-point mapped crossover
+        if solution2 == None:
+            heuristicIndex = random.choice([heuristic for heuristic in self.getHeuristics() if heuristic not in self.getHeursiticsOfType("CROSSOVER")])
+            solution2 = self.applyHeuristicSolution(heuristicIndex, solution)
+        solutionCopy = solution.copy()
+        solution2Copy = solution2.copy()
+
+        size = len(solutionCopy)
+        point = random.randint(1, size - 1)
+        child = solutionCopy[:point]
+        for city in solution2Copy:
+            if city not in child:
+                child.append(city)
+        return child
+
+
+    ### Ruin-Recreate Operators ###
+    def ruin_recreate_operator(self, solution):     #11
+        #remove a subset and reinsert using nearest insertion
+        solution_copy = solution.copy()
+        ruin_size = max(2, len(solution_copy) // 10)
+        indices = sorted(random.sample(range(len(solution_copy)), ruin_size))
+        removed = [solution_copy[i] for i in indices]
+        remaining = [city for city in solution_copy if city not in removed]
+        # Reinsert removed cities one by one using nearest insertion
+        for city in removed:
+            if not remaining:
+                remaining.append(city)
+                continue
+            best_position = 0
+            best_distance = float('inf')
+            for i in range(len(remaining) + 1):
+                new_tour = remaining[:i] + [city] + remaining[i:]
+                distance = self.calculateTotalDistance(new_tour)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_position = i
+            remaining = remaining[:best_position] + [city] + remaining[best_position:]
+        return remaining
 
 class ChoiceFunctionGreatDeluge:
     def __init__(self, r_seed=None, maxIteration=None, decayRate=None, inital_water_lvl=None):
@@ -190,7 +412,7 @@ class ChoiceFunctionGreatDeluge:
                 phi = 0.99
                 delta = 0.01
                 prev_fitness_change = fitness_change / time_to_apply
-            else:   #Non-improvment
+            else:   #No-improvment
                 phi = max(0.01, phi - 0.01)
                 phi = self.roundTwoDecimals(phi)
                 delta = self.roundTwoDecimals(1 - phi)
@@ -211,7 +433,7 @@ if __name__ == '__main__':
     tsplib = load_tsplib_distance_matrix("tsplib/a280.tsp")
     #problem = ProblemDomain(distance_matrix)
     problem = ProblemDomain(tsplib)
-    
+
     hyperH = ChoiceFunctionGreatDeluge(decayRate=0.01)
     hyperH.setTimeLimit(20)
     hyperH.solve(problem)
