@@ -1,6 +1,7 @@
 import random
 import time
 import numpy as np
+from tsplib_distance_matrix import load_tsplib_distance_matrix
 
 class ProblemDomain:
     def __init__(self, distance_matrix):
@@ -158,9 +159,12 @@ if __name__ == '__main__':
         [0, 5, 6, 7, 0],
     ]
 
+    tsplib = load_tsplib_distance_matrix("tsplib/a280.tsp")
     problem = ProblemDomain(distance_matrix)
+    #problem = ProblemDomain(tsplib)
+    
     hyperH = ModifiedChoiceFunction(123)
-    hyperH.setTimeLimit(5)
+    hyperH.setTimeLimit(20)
 
     hyperH.solve(problem)
 

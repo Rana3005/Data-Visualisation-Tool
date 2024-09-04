@@ -18,4 +18,10 @@ def load_tsplib_distance_matrix(tsplib_file: str) -> np.ndarray:
     
     # Set diagonal elements of distance matrix to zero. As distance from a city to itself is usually zero
     np.fill_diagonal(distance_matrix, 0)
+
+    coordinates = tsp_problem_instance.node_coords
+    #print(coordinates)
+
     return distance_matrix
+
+#load_tsplib_distance_matrix("tsplib/a280.tsp")

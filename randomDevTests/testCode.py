@@ -46,4 +46,7 @@ while unvisited:
     print(unvisited)
     city += 1
 
+ab = np.zeros((3, 3))
+ab[0][0] =1
+print(ab)
 
