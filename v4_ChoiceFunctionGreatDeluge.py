@@ -2,7 +2,7 @@ import random
 import time
 import numpy as np
 from random_cities import generate_random_cities
-from tsplib_distance_matrix import load_tsplib_distance_matrix
+from tsplib_functions import load_tsplib_distance_matrix
 
 class ProblemDomain:
     def __init__(self, distance_matrix):
@@ -25,10 +25,15 @@ class ProblemDomain:
     def getDistance(self, city1, city2):
         return self.distance_matrix[city1][city2]
     
-    def initialiseSolution(self, index):
-        self.solution = list(range(self.num_cities))
-        #random.shuffle(self.solution)
-        #self.solution = self.applyHeuristicSolution(7, self.solution)
+    def initialiseSolution(self, intial_type):
+        if intial_type == "None":
+            self.solution = list(range(self.num_cities))
+        elif intial_type == "Random":
+            self.solution = list(range(self.num_cities))
+            random.shuffle(self.solution)
+        elif intial_type == 'Nearest Neighbour':
+            self.solution = self.applyHeuristicSolution(6, list(range(self.num_cities)))
+
         self.best_solution = self.solution[:]
         self.best_solution_value = self.getFunctionValue()
 
@@ -367,15 +372,16 @@ class ProblemDomain:
         return remaining
 
 class ChoiceFunctionGreatDeluge:
-    def __init__(self, r_seed=None, maxIteration=None, decayRate=None, inital_water_lvl=None):
+    def __init__(self, r_seed=None, decayRate=None, inital_water_lvl=None):
         random.seed(r_seed)
         self.start_time = time.time()
-        self.time_limit = 30
-
-        self.all_step_solution = []
+        self.time_limit = None
+        self.max_iterations = None
+        self.initial_solution = 'None'      # Defines how solution is first initialised
+        
+        self.all_solution_step = []         #Holds list of improving solution tours
 
         #Great Deluge Parameters
-        self.max_iterations = maxIteration
         self.decay_rate = decayRate
         self.initial_water_level = inital_water_lvl
 
@@ -384,14 +390,25 @@ class ChoiceFunctionGreatDeluge:
     
     def setTimeLimit(self, timeLimit):
         self.time_limit = timeLimit
+
+    def setMaxIteration(self, maxIteration):
+        self.max_iterations = maxIteration
+
+    def setInitialSolution(self, intial_type):
+        self.initial_solution = intial_type
     
     def roundTwoDecimals(self, num):
         return round(num, 2)
+    
+    def checkTimeOrIteration(self, iteration):
+        if self.time_limit != None:
+            return not self.hasTimeExpired()
+        else:
+            return iteration < self.max_iterations
 
     def solve(self, problem: ProblemDomain):
-        problem.initialiseSolution(0)
-
-        self.all_step_solution = [problem.solution.copy()]
+        problem.initialiseSolution(self.initial_solution)
+        self.all_solution_step = [problem.solution.copy()]
 
         #Choice Function Parameters
         phi = 0.5
@@ -418,8 +435,12 @@ class ChoiceFunctionGreatDeluge:
         initial_water_level = self.initial_water_level
         water_level = initial_water_level if initial_water_level else current_obj_function_value
         decay_rate = self.decay_rate
+        
+        
+        iterations = 0
+        while self.checkTimeOrIteration(iterations):
+            iterations += 1
 
-        while not self.hasTimeExpired():
             if init_flag > 1:
                 best_heuristic_score = 0.0
                 for i in range(number_of_heuristics):
@@ -445,14 +466,12 @@ class ChoiceFunctionGreatDeluge:
                 #print(f"current value: {current_obj_function_value}")
                 #print(f"new value: {new_obj_function_value}")
                 current_obj_function_value = new_obj_function_value     #new_solution
-                self.all_step_solution.append(problem.solution.copy())
+                self.all_solution_step.append(problem.solution.copy())
 
                 if current_obj_function_value < problem.best_solution_value:
                     problem.best_solution = problem.solution[:]
                     problem.best_solution_value = current_obj_function_value
-                    #self.all_step_solution.append(problem.solution.copy())
-            else:
-                fitness_change = 0.0
+                    #self.all_solution_step.append(problem.solution.copy())
 
             #Update water level
             water_level -= decay_rate
@@ -488,16 +507,21 @@ class ChoiceFunctionGreatDeluge:
 
             last_heuristic_called = heuristic_to_apply
 
-"""
+
 if __name__ == '__main__':
-    tsplib = load_tsplib_distance_matrix("tsplib/a280.tsp")
+    tsplib = load_tsplib_distance_matrix("tsplib_data/a280.tsp")
     problem = ProblemDomain(tsplib)
+    problem.initialiseSolution("Nearest Neighbour")
 
     #distance_matrix, coordinates = generate_random_cities(10, 500, 500)
     #problem = ProblemDomain(distance_matrix)
-    hyperH = ChoiceFunctionGreatDeluge(decayRate=0.001)
-    hyperH.setTimeLimit(10)
-    hyperH.solve(problem)
-    solution = problem.getBestSolutionValue()
-    print(solution)
-"""
+    hyperH = ChoiceFunctionGreatDeluge(decayRate=0.1)
+    hyperH.setTimeLimit(5)
+    #hyperH.setMaxIteration(10)
+
+    #hyperH.solve(problem)
+    #solution = problem.getBestSolutionValue()
+    #print(solution)
+
+    print(f"m: {problem.mutation}, ls: {problem.localSearch}, c: {problem.crossover}, r: {problem.ruinrecreate}")
+

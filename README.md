@@ -3,3 +3,6 @@ Data Visualisation Tool for Choice Function – Great Deluge Hyper-Heuristic Sel
 
 Note:
 https://github.com/fillipe-gsm/python-tsp/blob/master/tests/data.py
+
+CMD line:
+pyside6-designer

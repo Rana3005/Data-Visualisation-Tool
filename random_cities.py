@@ -9,6 +9,8 @@ def generate_random_cities(num_cities, region_width, region_height, seed=None):
     # Minimum 4 cities
     if num_cities < 4:
         num_cities = 4
+    if num_cities > 500:
+        num_cities = 500
 
     # Create numpy array of coordinate based on number of cities
     # // rounds result down to nearest whole number
@@ -17,7 +19,6 @@ def generate_random_cities(num_cities, region_width, region_height, seed=None):
     #x_coordinates = np.random.randint(0, region_width, size=num_cities)
     #y_coordinates = np.random.randint(0, region_height, size=num_cities)
     coordinates = np.column_stack((x_coordinates, y_coordinates))
-
 
     # Distance matrix
     distance_matrix = np.zeros((num_cities, num_cities))

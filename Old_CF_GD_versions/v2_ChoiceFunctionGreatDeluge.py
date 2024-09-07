@@ -1,7 +1,7 @@
 import random
 import time
 import numpy as np
-from tsplib_distance_matrix import load_tsplib_distance_matrix
+from tsplib_functions import load_tsplib_distance_matrix
 
 class ProblemDomain:
     def __init__(self, distance_matrix):
