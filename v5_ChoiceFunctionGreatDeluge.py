@@ -1,6 +1,7 @@
 import random
 import time
 import numpy as np
+import math
 from random_cities import generate_random_cities
 from tsplib_functions import load_tsplib_distance_matrix
 
@@ -41,8 +42,8 @@ class ProblemDomain:
         return self.calculateTotalDistance(self.solution)
     
     def applyHeuristic(self, heuristic_index, current_index, new_index):
-        # Returns the solution value 
-        #solution_copy = self.solution.copy()
+        # Returns the solution value and updates current solution
+        #print("selected index", heuristic_index)
         if heuristic_index == 0:
             self.mutation += 1
             new_solution = self.swapHeursitic(self.solution)
@@ -89,7 +90,7 @@ class ProblemDomain:
         return self.calculateTotalDistance(new_solution)
     
     def applyHeuristicSolution(self, heuristic_index, solution):
-        #solution_copy = self.solution.copy()
+        # Just appiles heurisitc and doesn't update current solution
         if heuristic_index == 0:
             new_solution = self.swapHeursitic(solution)
         elif heuristic_index == 1:
@@ -125,12 +126,6 @@ class ProblemDomain:
             len(self.getHeursiticsOfType("MUTATION")) + \
             len(self.getHeursiticsOfType("RUIN_RECREATE"))
     
-    def getBestSolution(self):
-        return self.best_solution
-    
-    def getBestSolutionValue(self):
-        return self.best_solution_value
-    
     def getHeursiticsOfType(self, heuristicType):
         if heuristicType == "MUTATION":
             return [0, 1, 2, 3, 4]
@@ -147,6 +142,13 @@ class ProblemDomain:
             self.getHeursiticsOfType("CROSSOVER") + \
             self.getHeursiticsOfType("MUTATION") + \
             self.getHeursiticsOfType("RUIN_RECREATE")
+    
+    def getBestSolution(self):
+        return self.best_solution
+    
+    def getBestSolutionValue(self):
+        return self.best_solution_value
+
 
     ### Mutation Operators ###
     def swapHeursitic(self, solution):  #0
@@ -371,18 +373,22 @@ class ProblemDomain:
             remaining = remaining[:best_position] + [city] + remaining[best_position:]
         return remaining
 
+
 class ChoiceFunctionGreatDeluge:
-    def __init__(self, r_seed=None, decayRate=None, inital_water_lvl=None):
+    def __init__(self, r_seed=None, inital_water_lvl=None):
         random.seed(r_seed)
         self.start_time = time.time()
         self.time_limit = None
         self.max_iterations = None
-        self.initial_solution = 'None'      # Defines how solution is first initialised
-        
+        self.initial_solution_type = 'None'      # Defines how solution is first initialised
+        self.selected_heuristics = []
+        self.crossover_allowed = False
+
         self.all_solution_step = []         #Holds list of improving solution tours
 
         #Great Deluge Parameters
-        self.decay_rate = decayRate
+        self.decay_rate = 0.1
+        self.decay_model = 'Linear'
         self.initial_water_level = inital_water_lvl
 
     def hasTimeExpired(self):
@@ -394,20 +400,42 @@ class ChoiceFunctionGreatDeluge:
     def setMaxIteration(self, maxIteration):
         self.max_iterations = maxIteration
 
-    def setInitialSolution(self, intial_type):
-        self.initial_solution = intial_type
-    
-    def roundTwoDecimals(self, num):
-        return round(num, 2)
-    
+    def setSelectedHeuristic(self, selectedList):
+        self.selected_heuristics = selectedList
+        #print(self.selected_heuristics)
+
+    def isCrossoverAllowed(self, isAllowed):
+        self.crossover_allowed = isAllowed;
+
     def checkTimeOrIteration(self, iteration):
         if self.time_limit != None:
             return not self.hasTimeExpired()
         else:
             return iteration < self.max_iterations
 
+    def setInitialSolution(self, intialType):
+        self.initial_solution_type = intialType
+
+    def setDecayRate(self, decayRate):
+        self.decay_rate = decayRate
+
+    def setDeacyModel(self, decayModel):
+        self.decay_model = decayModel
+
+    def updateWaterLevel(self, water_level, iteration):
+        if self.decay_model == "Linear":
+            return water_level - self.decay_rate * iteration
+        elif self.decay_model == "Exponential":
+            return water_level * np.exp(-self.decay_rate * iteration)
+        elif self.decay_model == "Sinusoidal":
+            return water_level * (1 + np.sin(self.decay_rate * iteration))
+
+    def roundTwoDecimals(self, num):
+        return round(num, 2)
+
+
     def solve(self, problem: ProblemDomain):
-        problem.initialiseSolution(self.initial_solution)
+        problem.initialiseSolution(self.initial_solution_type)
         self.all_solution_step = [problem.solution.copy()]
 
         #Choice Function Parameters
@@ -416,7 +444,9 @@ class ChoiceFunctionGreatDeluge:
         heuristic_to_apply = 0.0
         init_flag = 0.0
         new_obj_function_value = 0.0    #new_solution_value
-        number_of_heuristics = problem.getNumberOfHeuristics()
+        
+        #number_of_heuristics = problem.getNumberOfHeuristics()
+        number_of_heuristics = len(self.selected_heuristics)
         current_obj_function_value = problem.getFunctionValue()    #current_solution_value
         best_heuristic_score = 0.0
         fitness_change = 0.0
@@ -428,14 +458,15 @@ class ChoiceFunctionGreatDeluge:
         last_heuristic_called = 0
         crossover_heuristics = problem.getHeursiticsOfType('CROSSOVER')
 
-        for i in crossover_heuristics:
-            f3[i] = float('-inf')
+        # Function runs if crossover_allowed is False
+        if not self.crossover_allowed:
+            for i, h_index in enumerate(self.selected_heuristics):
+                if h_index in crossover_heuristics:
+                    f3[i] = float('-inf')
 
         #Great Deluge Parameters
-        initial_water_level = self.initial_water_level
-        water_level = initial_water_level if initial_water_level else current_obj_function_value
-        decay_rate = self.decay_rate
-        
+        initial_water_level = initial_water_level if self.initial_water_level else current_obj_function_value
+        water_level = initial_water_level
         
         iterations = 0
         while self.checkTimeOrIteration(iterations):
@@ -448,14 +479,19 @@ class ChoiceFunctionGreatDeluge:
                     if F[i] > best_heuristic_score:
                         heuristic_to_apply = i
                         best_heuristic_score = F[i]
+            
             else:
                 crossflag = True
                 while crossflag:
                     heuristic_to_apply = random.randint(0, number_of_heuristics - 1)
-                    crossflag = heuristic_to_apply in crossover_heuristics
+                    #heuristic_to_apply = random.choice(self.selected_heuristics)
+                    crossflag = self.selected_heuristics[heuristic_to_apply] in crossover_heuristics
+
+            # Relate the index of heuristics_to_apply to index of selected heuristic to apply actual heuristic
+            actualHeuristicIndex = self.selected_heuristics[heuristic_to_apply]
 
             time_exp_before = time.time()
-            new_obj_function_value = problem.applyHeuristic(heuristic_to_apply, 0, 0)
+            new_obj_function_value = problem.applyHeuristic(actualHeuristicIndex, 0, 0)
             time_exp_after = time.time()
             time_to_apply = time_exp_after - time_exp_before + 1
 
@@ -463,18 +499,17 @@ class ChoiceFunctionGreatDeluge:
             
             #Great Deluge acceptance criterion
             if new_obj_function_value < water_level:
-                #print(f"current value: {current_obj_function_value}")
-                #print(f"new value: {new_obj_function_value}")
-                current_obj_function_value = new_obj_function_value     #new_solution
+                current_obj_function_value = new_obj_function_value     #new_solution accepted
                 self.all_solution_step.append(problem.solution.copy())
 
                 if current_obj_function_value < problem.best_solution_value:
                     problem.best_solution = problem.solution[:]
                     problem.best_solution_value = current_obj_function_value
+
                     #self.all_solution_step.append(problem.solution.copy())
 
             #Update water level
-            water_level -= decay_rate
+            water_level = self.updateWaterLevel(initial_water_level, iterations)
             #Prevent water level from rising too high, keep it close to best solution
             if water_level > problem.best_solution_value:
                water_level = problem.best_solution_value
@@ -511,17 +546,21 @@ class ChoiceFunctionGreatDeluge:
 if __name__ == '__main__':
     tsplib = load_tsplib_distance_matrix("tsplib_data/a280.tsp")
     problem = ProblemDomain(tsplib)
-    problem.initialiseSolution("Nearest Neighbour")
 
     #distance_matrix, coordinates = generate_random_cities(10, 500, 500)
     #problem = ProblemDomain(distance_matrix)
-    hyperH = ChoiceFunctionGreatDeluge(decayRate=0.1)
-    hyperH.setTimeLimit(5)
-    #hyperH.setMaxIteration(10)
+    hyperH = ChoiceFunctionGreatDeluge()
+    #hyperH.setTimeLimit(5)
+    hyperH.setInitialSolution('Random')
+    hyperH.setDeacyModel('Exponential')
+    hyperH.setDecayRate(0.1)
+    hyperH.setMaxIteration(100)
+    hyperH.setSelectedHeuristic([6,4,3,8])
+    hyperH.isCrossoverAllowed(False)
 
-    #hyperH.solve(problem)
-    #solution = problem.getBestSolutionValue()
-    #print(solution)
+    hyperH.solve(problem)
+    solution = problem.getBestSolutionValue()
+    print(solution)
 
     print(f"m: {problem.mutation}, ls: {problem.localSearch}, c: {problem.crossover}, r: {problem.ruinrecreate}")
 

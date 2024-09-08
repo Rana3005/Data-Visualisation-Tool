@@ -2,7 +2,8 @@ import sys
 import numpy as np
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QLineEdit,
-                               QPushButton, QCheckBox, QGridLayout, QRadioButton, QComboBox, QGroupBox)
+                               QPushButton, QCheckBox, QGridLayout, QRadioButton, QComboBox, QGroupBox,
+                               QListWidget, QListWidgetItem, QDialog, QDialogButtonBox)
 from PySide6.QtCore import QTimer, Qt
 
 import matplotlib.pyplot as plt
@@ -12,13 +13,16 @@ import matplotlib.animation as animation
 
 from tsplib_functions import load_tsplib_distance_matrix
 from random_cities import generate_random_cities
-from v4_ChoiceFunctionGreatDeluge import *
+from v5_ChoiceFunctionGreatDeluge import *
 
 
 class TSPVisualizer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setupUI()
+
+        self.heuristicDialog = HeuristicDialog()
+        self.heuristicSelctions = self.heuristicDialog.getSelected()
 
     def setupUI(self):
         # Set the main window
@@ -64,6 +68,18 @@ class TSPVisualizer(QMainWindow):
         tspSetup_gridLayout.addWidget(self.solution_initialize_label, 2, 0)
         tspSetup_gridLayout.addWidget(self.solution_initialize_comboBox, 2, 1)
 
+        # Heuristic operator selection
+        self.low_lvl_heuristicLabel = QLabel("Low-Level Heurisitics:")
+        self.low_lvl_heuristicButton = QPushButton("Select Operators")
+        self.low_lvl_heuristicButton.clicked.connect(self.selectHeuristics)
+        tspSetup_gridLayout.addWidget(self.low_lvl_heuristicLabel, 3, 0)
+        tspSetup_gridLayout.addWidget(self.low_lvl_heuristicButton, 3, 1)
+        
+        self.crossover_checkBox = QCheckBox("Enable Crossover")
+        tspSetup_gridLayout.rowStretch(4)
+        tspSetup_gridLayout.addWidget(self.crossover_checkBox, 4, 0)  # Position of widgit is 4th row, 0 column, size takes 1 row and columns
+        self.crossover_checkBox.toggled.connect(self.enableCrossover)
+
         inputLayout.addLayout(tspSetup_gridLayout)
 
         #Hyper-Heurisitc group box
@@ -79,7 +95,7 @@ class TSPVisualizer(QMainWindow):
         self.gd_waterLevel_label_comboBox.addItem('Sinusoidal')
         self.gd_decayRate_label = QLabel("Decay Rate:")
         self.gd_decayRate_input = QLineEdit()
-        self.gd_decayRate_input.setPlaceholderText("Set time limit (seconds)")
+        self.gd_decayRate_input.setPlaceholderText("Set decay rate (e.g. 0.1)")
         
         gd_gridLayout = QGridLayout()
         gd_gridLayout.addWidget(self.gd_waterLevel_label, 0, 0)
@@ -107,6 +123,21 @@ class TSPVisualizer(QMainWindow):
         layout.addWidget(self.canvas)
 
         layout.addLayout(inputLayout)
+        
+        
+    def selectHeuristics(self):
+        if(self.heuristicDialog.exec()):
+            self.heuristicSelctions = self.heuristicDialog.getSelected()
+            #print(self.heuristicSelctions)
+        else:
+            #print("cancel")
+            self.heuristicDialog.resetSelection()
+
+    def enableCrossover(self):
+        if self.crossover_checkBox.checkState() == Qt.CheckState.Checked:
+            print("check")
+        elif self.crossover_checkBox.checkState() == Qt.CheckState.Unchecked:
+            print("noCheck")
     
     # Disable input area based on checked box
     def time_iteration_stateChange(self):
@@ -118,13 +149,14 @@ class TSPVisualizer(QMainWindow):
             self.iterationLimitInput.setEnabled(True)
 
     def startSolving(self):
+        self.startButton.setEnabled(False)
         self.canvas.clear_fig()
 
         num_cities = int(self.numCitiesInput.text())
 
         distance_matrix, coordinates = generate_random_cities(num_cities, 500, 500)
         problem = ProblemDomain(distance_matrix)
-        hyperH = ChoiceFunctionGreatDeluge(decayRate=0.1)
+        hyperH = ChoiceFunctionGreatDeluge()
         
         # Check if time limit or iteration checked
         if self.timeLimitCheckbox.isChecked():
@@ -134,17 +166,92 @@ class TSPVisualizer(QMainWindow):
             iteration_limit = int(self.iterationLimitInput.text())
             hyperH.setMaxIteration(iteration_limit)
 
-
         # Set the initialization
         current_initialization = self.solution_initialize_comboBox.currentText()
         hyperH.setInitialSolution(current_initialization)
+
+        # Great Deluge decay parameters
+        gd_decay_type = self.gd_waterLevel_label_comboBox.currentText()
+        hyperH.setDeacyModel = gd_decay_type
+        gd_decay_rate = float(self.gd_decayRate_input.text())
+        hyperH.setDecayRate(gd_decay_rate)
 
         hyperH.solve(problem)
 
         solution = problem.getBestSolution()
         solution_steps = hyperH.all_solution_step
+        #print(len(solution_steps))
 
         self.canvas.start_animation(solution_steps, coordinates)
+        self.startButton.setEnabled(True)
+
+
+class HeuristicDialog(QDialog):
+    # Dialog box to select low-level heuristics
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.crossover = ProblemDomain(np.zeros((2,2))).getHeursiticsOfType("CROSSOVER")
+        
+        self.low_lvl_heuristicList = QListWidget()
+        self.add_checkableItems([
+                                ("Swap Mutation", 0),
+                                ("Inversion Mutation", 1), 
+                                ("Scramble Mutation", 2), 
+                                ("Insert Mutation", 3),
+                                ("Displacement Mutation", 4), 
+                                ("Two Opt", 5), 
+                                ("Nearest Neighhour", 6),
+                                ("Simulated Annealing", 7),
+                                ("Ruin-Recreate", 12),
+                                ("Order Crossover", 8),
+                                ("Partially Mapped Crossover", 9),
+                                ("Position-based Crossover", 10),
+                                ("One-Point Crossover", 11)])
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok
+                                      | QDialogButtonBox.Cancel)
+        
+        layout = QVBoxLayout()
+        layout.addWidget(self.low_lvl_heuristicList)
+        layout.addWidget(self.button_box)
+
+        self.setLayout(layout)
+
+        self.setWindowTitle("Low-Level heuristic Selection")
+
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+    # Creates checkable items
+    def add_checkableItems(self, items):
+        for heuristic_name, heuristic_value in items:
+            list_item = QListWidgetItem(heuristic_name)
+            list_item.setFlags(list_item.flags() | Qt.ItemFlag.ItemIsUserCheckable) # Enable checkbox, bitwise OR operator with current flags and checkable flag
+            list_item.setCheckState(Qt.CheckState.Checked)
+            list_item.setData(Qt.ItemDataRole.UserRole, heuristic_value)    # Stores value to item
+            self.low_lvl_heuristicList.addItem(list_item)
+
+    # Return selected items
+    def getSelected(self):
+        currently_selected = []
+        for i in range(self.low_lvl_heuristicList.count()):
+            item = self.low_lvl_heuristicList.item(i)
+            if item.checkState() == Qt.CheckState.Checked and item.flags() & Qt.ItemFlag.ItemIsEnabled:     # Check if item is checked and enabled, bitwise AND operator item's flag and enabled flag
+                currently_selected.append(item.data(Qt.UserRole))
+        
+        return currently_selected
+    
+    def resetSelection(self):
+        for i in range(self.low_lvl_heuristicList.count()):
+            item = self.low_lvl_heuristicList.item(i)
+            item.setCheckState(Qt.CheckState.Checked)
+
+    def toggleCrossoverSelection(self, isEnabled):
+        for i in range(self.low_lvl_heuristicList.count()):
+            item = self.low_lvl_heuristicList.item(i)
+
+            
+                  
 
 
 # Inherits from FigureCanvas
@@ -200,6 +307,7 @@ if __name__ == '__main__':
     app = QApplication([])
 
     visualizer = TSPVisualizer()
+    visualizer = HeuristicDialog()
     visualizer.show()
     
     # app.exec() - event loop, wait for user action // sys.exit() called when terminate program

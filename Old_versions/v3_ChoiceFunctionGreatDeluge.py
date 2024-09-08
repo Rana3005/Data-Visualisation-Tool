@@ -435,7 +435,8 @@ class ChoiceFunctionGreatDeluge:
             #Great Deluge acceptance criterion
             if new_obj_function_value < water_level:
                 current_obj_function_value = new_obj_function_value     #new_solution
-                
+                #print(f"current value: {current_obj_function_value}")
+                #print(f"new value: {new_obj_function_value}")
                 if current_obj_function_value < problem.best_solution_value:
                     problem.best_solution = problem.solution[:]
                     problem.best_solution_value = current_obj_function_value
