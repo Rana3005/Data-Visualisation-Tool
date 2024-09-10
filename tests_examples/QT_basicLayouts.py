@@ -76,7 +76,8 @@ class Dialog(QDialog):
 
         self._small_editor = QTextEdit()
         self._small_editor.setPlainText("This widget takes up about two thirds of the grid layout.")
-
+        for i in range(13):
+            self._small_editor.append("testing")
         layout.addWidget(self._small_editor, 0, 2, 4, 1)
 
         layout.setColumnStretch(1, 10)

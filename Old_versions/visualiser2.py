@@ -1,9 +1,10 @@
 import sys
 import numpy as np
+import os
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QLineEdit,
-                               QPushButton, QCheckBox, QGridLayout, QRadioButton, QComboBox, QGroupBox,
-                               QListWidget, QListWidgetItem, QDialog, QDialogButtonBox)
+                               QPushButton, QCheckBox, QGridLayout, QRadioButton, QComboBox, QGroupBox, QMessageBox,
+                               QListWidget, QListWidgetItem, QDialog, QDialogButtonBox, QFileDialog, QFrame)
 from PySide6.QtCore import QTimer, Qt
 
 import matplotlib.pyplot as plt
@@ -19,15 +20,16 @@ from v5_ChoiceFunctionGreatDeluge import *
 class TSPVisualizer(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setupUI()
-
         self.heuristicDialog = HeuristicDialog()
-        self.heuristicSelctions = self.heuristicDialog.getSelected()
+        self.loaded_distanceMatrix = None
+        self.loaded_matrixCoordinates = None
+        
+        self.setupUI()
 
     def setupUI(self):
         # Set the main window
         self.setWindowTitle("TSP Visualizer")
-        self.setGeometry(100, 50, 1000, 700)
+        self.setGeometry(100, 50, 1200, 725)
 
         # Widget set as central widget
         widget = QWidget()
@@ -68,17 +70,25 @@ class TSPVisualizer(QMainWindow):
         tspSetup_gridLayout.addWidget(self.solution_initialize_label, 2, 0)
         tspSetup_gridLayout.addWidget(self.solution_initialize_comboBox, 2, 1)
 
+        # Decorative Line
+        heuristicLine = QFrame()
+        heuristicLine.setFrameShape(QFrame.HLine)    # Set frame shape to horizontal
+        heuristicLine.setFrameShadow(QFrame.Raised)  # Set frame shadow
+        tspSetup_gridLayout.addWidget(heuristicLine, 3, 0, 1, 2) 
+
         # Heuristic operator selection
         self.low_lvl_heuristicLabel = QLabel("Low-Level Heurisitics:")
         self.low_lvl_heuristicButton = QPushButton("Select Operators")
         self.low_lvl_heuristicButton.clicked.connect(self.selectHeuristics)
-        tspSetup_gridLayout.addWidget(self.low_lvl_heuristicLabel, 3, 0)
-        tspSetup_gridLayout.addWidget(self.low_lvl_heuristicButton, 3, 1)
+        tspSetup_gridLayout.addWidget(self.low_lvl_heuristicLabel, 4, 0)
+        tspSetup_gridLayout.addWidget(self.low_lvl_heuristicButton, 4, 1)
         
         self.crossover_checkBox = QCheckBox("Enable Crossover")
         tspSetup_gridLayout.rowStretch(4)
-        tspSetup_gridLayout.addWidget(self.crossover_checkBox, 4, 0)  # Position of widgit is 4th row, 0 column, size takes 1 row and columns
+        tspSetup_gridLayout.addWidget(self.crossover_checkBox, 5, 0)  # Position of widgit is 4th row, 0 column, size takes 1 row and columns
         self.crossover_checkBox.toggled.connect(self.enableCrossover)
+        self.enableCrossover(False)
+        self.heuristicDialog.selections = self.heuristicDialog.getSelected()
 
         inputLayout.addLayout(tspSetup_gridLayout)
 
@@ -105,13 +115,47 @@ class TSPVisualizer(QMainWindow):
         hyperh_groupBoxLayout.addWidget(self.gd_label)
         hyperh_groupBoxLayout.addLayout(gd_gridLayout)
 
+        #self.choice_function = QLabel("Great Deluge")
+        #hyperh_groupBoxLayout.addWidget(self.choice_function)
+
         inputLayout.addWidget(hyperheuristic_groupBox)
 
-        # Number of cities input
+        #TSP Instance group box
+        tspInstance_groupBox = QGroupBox("TSP Instance")
+        tspInstance_groupBoxLayout = QVBoxLayout()
+        tspInstance_groupBox.setLayout(tspInstance_groupBoxLayout)
+        
+        tspInstance_gridLayout = QGridLayout()
+        # Number of TSP cities input
+        self.numCitiesRadioButton = QRadioButton("Number of Cities:")
         self.numCitiesInput = QLineEdit()
         self.numCitiesInput.setPlaceholderText("Set number of cities (4-500)")
-        inputLayout.addWidget(QLabel("Number of Cities:"))
-        inputLayout.addWidget(self.numCitiesInput)
+        tspInstance_gridLayout.addWidget(self.numCitiesRadioButton, 0, 0)
+        tspInstance_gridLayout.addWidget(self.numCitiesInput, 0, 1)
+
+        # Decorative Line
+        tsplibLine = QFrame()
+        tsplibLine.setFrameShape(QFrame.HLine)    # Set frame shape to horizontal
+        tsplibLine.setFrameShadow(QFrame.Raised)  # Set frame shadow
+        tspInstance_gridLayout.addWidget(tsplibLine, 1, 0, 1, 2) 
+
+        # Load TSPLIB file
+        self.tsplib_load_RadioButton = QRadioButton("Load TSPLIB File:")
+        self.tsplibButton = QPushButton("Load")
+        self.tsplib_loadedLabel = QLabel("Loaded File:")
+        self.tsplib_loadedFileLabel = QLabel("Empty")
+        self.tsplibButton.clicked.connect(self.loadTSPLIB)
+        tspInstance_gridLayout.addWidget(self.tsplib_load_RadioButton, 2, 0)
+        tspInstance_gridLayout.addWidget(self.tsplibButton, 2, 1)
+        tspInstance_gridLayout.addWidget(self.tsplib_loadedLabel, 3, 0)
+        tspInstance_gridLayout.addWidget(self.tsplib_loadedFileLabel, 3, 1)
+
+        self.numCitiesRadioButton.toggled.connect(self.tspSelection_stateChange)
+        self.tsplib_load_RadioButton.toggled.connect(self.tspSelection_stateChange)
+        self.numCitiesRadioButton.setChecked(True)
+
+        tspInstance_groupBoxLayout.addLayout(tspInstance_gridLayout)
+        inputLayout.addWidget(tspInstance_groupBox)
 
         # Start button
         self.startButton = QPushButton("Start")
@@ -119,25 +163,55 @@ class TSPVisualizer(QMainWindow):
         inputLayout.addWidget(self.startButton)
 
         # TSP plot canvas
+        grid_plot = QGridLayout()
         self.canvas = TSPCanvas(self)
-        layout.addWidget(self.canvas)
+        grid_plot.addWidget(self.canvas, 0, 0, 2, 3)
+
+        #self.objectiveValue_canvas = ObjectiveValueCanvas(self)
+        #grid_plot.addWidget(self.objectiveValue_canvas, 0, 3)
+
+        layout.addLayout(grid_plot)
 
         layout.addLayout(inputLayout)
+
+    # Loads TSPLIB instance 
+    def loadTSPLIB(self):
+        filePath, fileType = QFileDialog.getOpenFileName(self, 
+                                                  "Select TSPLIB file",
+                                                  '',
+                                                  "TSPLIB (*.tsp)")
         
-        
+        if not filePath:
+            return
+
+        fileName = os.path.basename(filePath)
+        try:
+            distanceMatrix, coordinates = load_tsplib_distance_matrix(filePath)
+            # Set currently loaded file
+            self.tsplib_loadedFileLabel.setText(fileName)
+            self.loaded_distanceMatrix = distanceMatrix
+            self.loaded_matrixCoordinates = coordinates
+
+        except Exception as e:
+            QMessageBox.information(self, "Unable to open file",
+                                    f'There was an error opening "{fileName}": \n{str(e)}')
+            return
+    
+    # Updates selected heuristics list
     def selectHeuristics(self):
         if(self.heuristicDialog.exec()):
-            self.heuristicSelctions = self.heuristicDialog.getSelected()
-            #print(self.heuristicSelctions)
+            self.heuristicDialog.selections = self.heuristicDialog.getSelected()
+            #print(self.heuristicDialog.selections)
         else:
             #print("cancel")
             self.heuristicDialog.resetSelection()
 
-    def enableCrossover(self):
-        if self.crossover_checkBox.checkState() == Qt.CheckState.Checked:
-            print("check")
-        elif self.crossover_checkBox.checkState() == Qt.CheckState.Unchecked:
-            print("noCheck")
+    # Enable crossover heuristics to be applied
+    def enableCrossover(self, isEnabled=None):
+        if self.crossover_checkBox.checkState() == Qt.CheckState.Checked or isEnabled == True:
+            self.heuristicDialog.toggleCrossoverSelection(True)
+        elif self.crossover_checkBox.checkState() == Qt.CheckState.Unchecked or isEnabled == False:
+            self.heuristicDialog.toggleCrossoverSelection(False)
     
     # Disable input area based on checked box
     def time_iteration_stateChange(self):
@@ -148,13 +222,27 @@ class TSPVisualizer(QMainWindow):
             self.timeLimitInput.setEnabled(False)
             self.iterationLimitInput.setEnabled(True)
 
+    def tspSelection_stateChange(self):
+        if self.numCitiesRadioButton.isChecked():
+            self.numCitiesInput.setEnabled(True)
+            self.tsplibButton.setEnabled(False)
+        elif self.tsplib_load_RadioButton.isChecked():
+            self.tsplibButton.setEnabled(True)
+            self.numCitiesInput.setEnabled(False)
+
     def startSolving(self):
         self.startButton.setEnabled(False)
         self.canvas.clear_fig()
 
-        num_cities = int(self.numCitiesInput.text())
+        # Set the TSP instance
+        if self.numCitiesRadioButton.isChecked():
+            num_cities = int(self.numCitiesInput.text())
+            distance_matrix, coordinates = generate_random_cities(num_cities, 500, 500)
+        elif self.tsplib_load_RadioButton.isChecked():
+            distance_matrix = self.loaded_distanceMatrix
+            coordinates = self.loaded_matrixCoordinates
 
-        distance_matrix, coordinates = generate_random_cities(num_cities, 500, 500)
+        # Initialise ProblemDomain and Hyper-Heuristic
         problem = ProblemDomain(distance_matrix)
         hyperH = ChoiceFunctionGreatDeluge()
         
@@ -176,6 +264,11 @@ class TSPVisualizer(QMainWindow):
         gd_decay_rate = float(self.gd_decayRate_input.text())
         hyperH.setDecayRate(gd_decay_rate)
 
+        # Heuristic Selections
+        hyperH.isCrossoverAllowed(self.crossover_checkBox.isChecked())
+        hyperH.setSelectedHeuristic(self.heuristicDialog.selections)
+        print(self.heuristicDialog.selections)
+
         hyperH.solve(problem)
 
         solution = problem.getBestSolution()
@@ -185,12 +278,15 @@ class TSPVisualizer(QMainWindow):
         self.canvas.start_animation(solution_steps, coordinates)
         self.startButton.setEnabled(True)
 
+        #self.objectiveValue_canvas.plotObjectiveValue(hyperH.all_Objective_value, problem.init_solution_value, problem.getBestSolutionValue())
+
 
 class HeuristicDialog(QDialog):
     # Dialog box to select low-level heuristics
     def __init__(self, parent=None):
         super().__init__(parent)
         self.crossover = ProblemDomain(np.zeros((2,2))).getHeursiticsOfType("CROSSOVER")
+        self.selections = []
         
         self.low_lvl_heuristicList = QListWidget()
         self.add_checkableItems([
@@ -202,22 +298,22 @@ class HeuristicDialog(QDialog):
                                 ("Two Opt", 5), 
                                 ("Nearest Neighhour", 6),
                                 ("Simulated Annealing", 7),
-                                ("Ruin-Recreate", 12),
                                 ("Order Crossover", 8),
                                 ("Partially Mapped Crossover", 9),
                                 ("Position-based Crossover", 10),
-                                ("One-Point Crossover", 11)])
+                                ("One-Point Crossover", 11),
+                                ("Ruin-Recreate", 12)])
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok
                                       | QDialogButtonBox.Cancel)
-        
+
         layout = QVBoxLayout()
         layout.addWidget(self.low_lvl_heuristicList)
         layout.addWidget(self.button_box)
 
         self.setLayout(layout)
 
-        self.setWindowTitle("Low-Level heuristic Selection")
+        self.setWindowTitle("Low-Level Heuristic Selection")
 
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
@@ -246,12 +342,23 @@ class HeuristicDialog(QDialog):
             item = self.low_lvl_heuristicList.item(i)
             item.setCheckState(Qt.CheckState.Checked)
 
+        self.selections = self.getSelected()
+        #print(self.selections)
+
     def toggleCrossoverSelection(self, isEnabled):
         for i in range(self.low_lvl_heuristicList.count()):
             item = self.low_lvl_heuristicList.item(i)
-
-            
-                  
+            if item.data(Qt.UserRole) in self.crossover: 
+                if not isEnabled:
+                    item.setFlags(Qt.ItemFlag.NoItemFlags)
+                else:
+                    item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            else:
+                if isEnabled:
+                    item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+        
+        self.selections = self.getSelected()
+        #print(self.selections)
 
 
 # Inherits from FigureCanvas
@@ -302,12 +409,29 @@ class TSPCanvas(FigureCanvasQTAgg):
         self.draw()
 
 
+class ObjectiveValueCanvas(FigureCanvasQTAgg):
+    def __init__(self, parent=None):
+        self.figObjective, self.axObjective = plt.subplots()
+        # Pass figure to super class figureCanvas
+        super().__init__(self.figObjective)
+
+    def plotObjectiveValue(self, objectiveValueList, initSolution, bestSolution):
+        self.axObjective.clear()
+
+        self.axObjective.plot([i for i in range(len(objectiveValueList))], objectiveValueList)
+        init_line = plt.axhline(y=initSolution, color='r', linestyle='--')
+        best_line = plt.axhline(y=bestSolution, color='g', linestyle='--')
+        self.axObjective.legend([init_line, best_line], ['Initial Objective Value', 'Optimized Objective Value'])
+        self.axObjective.set_ylabel('Objective Value')
+        self.axObjective.set_xlabel('Iteration')
+        self.draw_idle()
+
 if __name__ == '__main__':
     # QApplications class, manages main event loop, window system integration, settings // [] to pass command-line arguments
     app = QApplication([])
 
     visualizer = TSPVisualizer()
-    visualizer = HeuristicDialog()
+    #visualizer = HeuristicDialog()
     visualizer.show()
     
     # app.exec() - event loop, wait for user action // sys.exit() called when terminate program

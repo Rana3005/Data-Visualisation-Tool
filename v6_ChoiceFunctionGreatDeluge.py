@@ -10,8 +10,10 @@ class ProblemDomain:
         self.distance_matrix = distance_matrix
         self.num_cities = len(distance_matrix)
         self.solution = []
+        self.init_solution_value = None
         self.best_solution = []
         self.best_solution_value = float('inf')
+        
         self.mutation = 0
         self.localSearch = 0
         self.crossover =0
@@ -35,8 +37,9 @@ class ProblemDomain:
         elif intial_type == 'Nearest Neighbour':
             self.solution = self.applyHeuristicSolution(6, list(range(self.num_cities)))
 
+        self.init_solution_value = self.getFunctionValue()
         self.best_solution = self.solution[:]
-        self.best_solution_value = self.getFunctionValue()
+        self.best_solution_value = self.init_solution_value
 
     def getFunctionValue(self):
         return self.calculateTotalDistance(self.solution)
@@ -385,6 +388,7 @@ class ChoiceFunctionGreatDeluge:
         self.crossover_allowed = False
 
         self.all_solution_step = []         #Holds list of improving solution tours
+        self.all_Objective_value = []
 
         #Great Deluge Parameters
         self.decay_rate = 0.1
@@ -405,7 +409,7 @@ class ChoiceFunctionGreatDeluge:
         #print(self.selected_heuristics)
 
     def isCrossoverAllowed(self, isAllowed):
-        self.crossover_allowed = isAllowed;
+        self.crossover_allowed = isAllowed
 
     def checkTimeOrIteration(self, iteration):
         if self.time_limit != None:
@@ -437,6 +441,7 @@ class ChoiceFunctionGreatDeluge:
     def solve(self, problem: ProblemDomain):
         problem.initialiseSolution(self.initial_solution_type)
         self.all_solution_step = [problem.solution.copy()]
+        self.all_Objective_value = [problem.getFunctionValue()]
 
         #Choice Function Parameters
         phi = 0.5
@@ -500,20 +505,21 @@ class ChoiceFunctionGreatDeluge:
             #Great Deluge acceptance criterion
             if new_obj_function_value < water_level:
                 current_obj_function_value = new_obj_function_value     #new_solution accepted
-                self.all_solution_step.append(problem.solution.copy())
+                #self.all_solution_step.append(problem.solution.copy())
 
                 if current_obj_function_value < problem.best_solution_value:
                     problem.best_solution = problem.solution[:]
                     problem.best_solution_value = current_obj_function_value
 
-                    #self.all_solution_step.append(problem.solution.copy())
+                    self.all_solution_step.append(problem.solution.copy())
+
+            self.all_Objective_value.append(new_obj_function_value)
 
             #Update water level
             water_level = self.updateWaterLevel(initial_water_level, iterations)
             #Prevent water level from rising too high, keep it close to best solution
-            if water_level > problem.best_solution_value:
-               water_level = problem.best_solution_value
-
+            #if water_level > problem.best_solution_value:
+            #   water_level = problem.best_solution_value
 
             if init_flag > 1:
                 f1[heuristic_to_apply] = fitness_change / time_to_apply + phi * f1[heuristic_to_apply]
@@ -544,7 +550,7 @@ class ChoiceFunctionGreatDeluge:
 
 
 if __name__ == '__main__':
-    tsplib = load_tsplib_distance_matrix("tsplib_data/a280.tsp")
+    tsplib, coordinate = load_tsplib_distance_matrix("tsplib_data/a280.tsp")
     problem = ProblemDomain(tsplib)
 
     #distance_matrix, coordinates = generate_random_cities(10, 500, 500)
@@ -554,7 +560,7 @@ if __name__ == '__main__':
     hyperH.setInitialSolution('Random')
     hyperH.setDeacyModel('Exponential')
     hyperH.setDecayRate(0.1)
-    hyperH.setMaxIteration(100)
+    hyperH.setMaxIteration(1000)
     hyperH.setSelectedHeuristic([6,4,3,8])
     hyperH.isCrossoverAllowed(False)
 
