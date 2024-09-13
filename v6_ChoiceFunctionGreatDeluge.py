@@ -13,11 +13,23 @@ class ProblemDomain:
         self.init_solution_value = None
         self.best_solution = []
         self.best_solution_value = float('inf')
-        
-        self.mutation = 0
-        self.localSearch = 0
-        self.crossover =0
-        self.ruinrecreate = 0
+
+        # Dictionary storing heuristic usage count, name and type
+        self.heuristics = {
+            0: {'name': "Swap Mutation", 'count': 0, 'type': "Mutation"},
+            1: {'name': "Inversion Mutation", 'count': 0, 'type': "Mutation"},
+            2: {'name': "Scramble Mutation", 'count': 0, 'type': "Mutation"},
+            3: {'name': "Insert Mutation", 'count': 0, 'type': "Mutation"},
+            4: {'name': "Displacement Mutation", 'count': 0, 'type': "Mutation"},
+            5: {'name': "Two Opt", 'count': 0,'type': "Local Search" },
+            6: {'name': "Nearest Neighhour", 'count': 0, 'type': "Local Search"},
+            7: {'name': "Simulated Annealing", 'count': 0, 'type': "Local Search"},
+            8: {'name': "Order Crossover", 'count': 0, 'type': "Crossover"},
+            9: {'name': "Partially Mapped Crossover", 'count': 0, 'type': "Crossover"},
+            10: {'name': "Position-based Crossover", 'count': 0, 'type': "Crossover"},
+            11: {'name': "One-Point Crossover", 'count': 0, 'type': "Crossover"},
+            12: {'name': "Ruin-Recreate", 'count': 0, 'type': "Ruin-Recreate"},
+        }
 
     def calculateTotalDistance(self, solution):
         total_distance = 0
@@ -44,52 +56,52 @@ class ProblemDomain:
     def getFunctionValue(self):
         return self.calculateTotalDistance(self.solution)
     
+    def getHeuristicNames(self, index=None):
+        if index is not None:
+            return self.heuristics[index]['name']
+        return [self.heuristics[i]['name'] for i in self.heuristics]
+    
+    def getHeuristicCounts(self):
+        return [self.heuristics[i]['count'] for i in self.heuristics]
+    
+    def getHeuristicType(self):
+        return [self.heuristics[i]['type'] for i in self.heuristics]
+    
     def applyHeuristic(self, heuristic_index, current_index, new_index):
         # Returns the solution value and updates current solution
         #print("selected index", heuristic_index)
-        if heuristic_index == 0:
-            self.mutation += 1
+        if heuristic_index == 0:            
             new_solution = self.swapHeursitic(self.solution)
-        elif heuristic_index == 1:
-            self.mutation += 1
+        elif heuristic_index == 1:            
             new_solution = self.inversionHeursitic(self.solution)
-        elif heuristic_index == 2:
-            self.mutation += 1
+        elif heuristic_index == 2:            
             new_solution = self.scramble_subtourHeuristic(self.solution)
-        elif heuristic_index == 3:
-            self.mutation += 1
+        elif heuristic_index == 3:            
             new_solution = self.insertHeursitic(self.solution)
-        elif heuristic_index == 4:
-            self.mutation += 1
+        elif heuristic_index == 4:            
             new_solution = self.displacementHeuristic(self.solution)
-        elif heuristic_index == 5:
-            self.localSearch += 1
+        elif heuristic_index == 5:            
             new_solution = self.two_OptHeursitic(self.solution)
-        elif heuristic_index == 6:
-            self.localSearch += 1
+        elif heuristic_index == 6:            
             new_solution = self.nearestNeighbor_Heuristic(self.solution)
-        elif heuristic_index == 7:
-            self.localSearch += 1
+        elif heuristic_index == 7:            
             new_solution = self.simulatedAnnealing_Heuristic(self.solution)
-        elif heuristic_index == 8:
-            self.crossover += 1
+        elif heuristic_index == 8:            
             new_solution = self.order_crossover(self.solution)
-        elif heuristic_index == 9:
-            self.crossover += 1
+        elif heuristic_index == 9:            
             new_solution = self.pmx_crossover(self.solution)
-        elif heuristic_index == 10:
-            self.crossover += 1
+        elif heuristic_index == 10:            
             new_solution = self.pbx_crossover(self.solution)
         elif heuristic_index == 11:
-            self.crossover += 1
             new_solution = self.oneX_crossover(self.solution)
         elif heuristic_index == 12:
-            self.ruinrecreate += 1
             new_solution = self.ruin_recreate_operator(self.solution)
-        #need multi solution tsp
 
         # Update current solution
         self.solution = new_solution.copy()
+        # Increment count of heurisitics in dictionary
+        self.heuristics[heuristic_index]['count'] += 1
+
         return self.calculateTotalDistance(new_solution)
     
     def applyHeuristicSolution(self, heuristic_index, solution):
@@ -389,8 +401,15 @@ class ChoiceFunctionGreatDeluge:
 
         self.all_solution_step = []         #Holds list of improving solution tours
         self.all_Objective_value = []
+        self.all_waterLevelChange = []
+        self.totalIterations = 0
+        self.tsp_log = None
 
-        #Great Deluge Parameters
+        # Choice Fuction Parameters
+        self.phi = None
+        self.delta = None
+
+        # Great Deluge Parameters
         self.decay_rate = 0.1
         self.decay_model = 'Linear'
         self.initial_water_level = inital_water_lvl
@@ -416,6 +435,10 @@ class ChoiceFunctionGreatDeluge:
             return not self.hasTimeExpired()
         else:
             return iteration < self.max_iterations
+        
+    def setPhiDelta_CF(self, phi, delta):
+        self.phi = phi
+        self.delta = delta
 
     def setInitialSolution(self, intialType):
         self.initial_solution_type = intialType
@@ -438,14 +461,16 @@ class ChoiceFunctionGreatDeluge:
         return round(num, 2)
 
 
-    def solve(self, problem: ProblemDomain):
+    def solve(self, problem: ProblemDomain, update_callback = None):
         problem.initialiseSolution(self.initial_solution_type)
         self.all_solution_step = [problem.solution.copy()]
         self.all_Objective_value = [problem.getFunctionValue()]
 
+        self.tsp_log = TSPLogger()
+
         #Choice Function Parameters
-        phi = 0.5
-        delta = 0.5
+        phi = self.phi
+        delta = self.delta
         heuristic_to_apply = 0.0
         init_flag = 0.0
         new_obj_function_value = 0.0    #new_solution_value
@@ -472,8 +497,15 @@ class ChoiceFunctionGreatDeluge:
         #Great Deluge Parameters
         initial_water_level = initial_water_level if self.initial_water_level else current_obj_function_value
         water_level = initial_water_level
+        self.all_waterLevelChange.append(water_level)
         
         iterations = 0
+        acceptedSolutions = 0
+
+        # Log the first intialisation
+        self.tsp_log.log_iteration(acceptedSolutions, problem.best_solution, current_obj_function_value, 
+                                          "None", water_level, phi, delta, iterations )
+        
         while self.checkTimeOrIteration(iterations):
             iterations += 1
 
@@ -510,16 +542,27 @@ class ChoiceFunctionGreatDeluge:
                 if current_obj_function_value < problem.best_solution_value:
                     problem.best_solution = problem.solution[:]
                     problem.best_solution_value = current_obj_function_value
-
+                    
                     self.all_solution_step.append(problem.solution.copy())
+                    acceptedSolutions += 1
+                    heuristicName = problem.getHeuristicNames(actualHeuristicIndex)
+
+                    #Log soltution values
+                    self.tsp_log.log_iteration(acceptedSolutions, problem.best_solution, current_obj_function_value, 
+                                          heuristicName, water_level, phi, delta, iterations )
+                    
+                    # Periodically update best solution found using update callback
+                    #if update_callback:
+                    #    update_callback(self.all_solution_step)
 
             self.all_Objective_value.append(new_obj_function_value)
 
             #Update water level
             water_level = self.updateWaterLevel(initial_water_level, iterations)
+            self.all_waterLevelChange.append(water_level)
             #Prevent water level from rising too high, keep it close to best solution
-            #if water_level > problem.best_solution_value:
-            #   water_level = problem.best_solution_value
+            if water_level > problem.best_solution_value:
+               water_level = problem.best_solution_value
 
             if init_flag > 1:
                 f1[heuristic_to_apply] = fitness_change / time_to_apply + phi * f1[heuristic_to_apply]
@@ -548,6 +591,27 @@ class ChoiceFunctionGreatDeluge:
 
             last_heuristic_called = heuristic_to_apply
 
+        self.totalIterations = iterations
+
+class TSPLogger:
+    def __init__(self):
+        self.log_entries = []
+
+    def log_iteration(self, iteration, current_solution, best_obj_value, move_type, waterLevel, phi, delta, convergence):
+        entry = {
+            'iteration': iteration,
+            'solution': current_solution,
+            'best_obj_value': best_obj_value,
+            'move_type': move_type,
+            'gd_waterlevel': waterLevel,
+            'phi': phi,
+            'delta': delta,
+            'convergence': convergence
+        }
+        self.log_entries.append(entry)
+
+    def getLastEntry(self):
+        return self.log_entries[-1]
 
 if __name__ == '__main__':
     tsplib, coordinate = load_tsplib_distance_matrix("tsplib_data/a280.tsp")
@@ -568,5 +632,5 @@ if __name__ == '__main__':
     solution = problem.getBestSolutionValue()
     print(solution)
 
-    print(f"m: {problem.mutation}, ls: {problem.localSearch}, c: {problem.crossover}, r: {problem.ruinrecreate}")
+    #print(f"m: {problem.mutation}, ls: {problem.localSearch}, c: {problem.crossover}, r: {problem.ruinrecreate}")
 

@@ -1,6 +1,7 @@
 import tsplib95
 import numpy as np
 from sklearn.manifold import MDS
+import os
 
 #Return distance matrix from tsplib file
 def load_tsplib_distance_matrix(tsplib_file: str) -> np.ndarray:
@@ -40,6 +41,50 @@ def calculate_coordinate_distance_matrix(distance_matrix):
     coordinates = mds.fit_transform(distance_matrix)
     return coordinates
 
+def save_tsp_instance(tsplibfileName, coordinates):
+    # Create TSPLIB problem
+    #tsp_problem = tsplib95.models.StandardProblem()
+    fileName = os.path.basename(tsplibfileName)
+
+    # File name
+    name = fileName
+    # Problem dimensions - number of cities
+    dimension = coordinates.shape[0]
+
+    tsp_data = create_tsplib_content(fileName, coordinates)
+    
+    # save tsp problem
+    with open(tsplibfileName, 'w') as tsp_file:
+        tsp_file.write(tsp_data)
+
+def create_tsplib_content(name, coordinates):
+        # Creates the TSPLIB file content as a string
+        num_cities = coordinates.shape[0]
+
+        # Header section
+        content = f"NAME: {name}\n"
+        content += "TYPE: TSP\n"
+        content += f"DIMENSION: {num_cities}\n"
+        content += "EDGE_WEIGHT_TYPE: EUC_2D\n"
+        content += "NODE_COORD_SECTION\n"
+
+        # Add the coordinates
+        for i, (x, y) in enumerate(coordinates, start=1):
+            content += f"{i} {x} {y}\n"
+
+        # End of file marker
+        content += "EOF\n"
+
+        return content
+
 
 if __name__ == "__main__":
-    d, c = load_tsplib_distance_matrix("tsplib_data/ali535.tsp")
+    d, c = load_tsplib_distance_matrix("tsplib_data/test.tsp")
+    test = np.array([
+            [10, 15],
+            [20, 25],
+            [30, 35],
+            [40, 45]
+        ])
+    
+    #save_tsp_instance("C:/Users/chira/Documents/University Masters/Final Project/Data Visualisation Tool/tsplib_data/test.tsp", test)
