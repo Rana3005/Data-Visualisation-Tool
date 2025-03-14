@@ -376,84 +376,89 @@ class TSPVisualizer(QMainWindow):
             self.load_action.setEnabled(True)
 
     def startSolving(self):
-        self.solvingLabel.setText("Solving...")
-        self.startButton.setEnabled(False)
         self.canvas.clear_fig()
         self.heuristicLogs.clear()
 
-        #try:
-        # Set the TSP instance
-        if self.numCitiesRadioButton.isChecked():
-            num_cities = int(self.numCitiesInput.text())
-            self.main_distanceMatrix, self.main_coordinates = generate_random_cities(num_cities, 500, 500)
-        elif self.tsplib_load_RadioButton.isChecked():
-            self.main_distanceMatrix = self.loaded_distanceMatrix
-            self.main_coordinates = self.loaded_matrixCoordinates
+        try:
+            # Set the TSP instance
+            if self.numCitiesRadioButton.isChecked():
+                num_cities = int(self.numCitiesInput.text())
+                self.main_distanceMatrix, self.main_coordinates = generate_random_cities(num_cities, 500, 500)
+            elif self.tsplib_load_RadioButton.isChecked():
+                self.main_distanceMatrix = self.loaded_distanceMatrix
+                self.main_coordinates = self.loaded_matrixCoordinates
 
-        # Initialise ProblemDomain and Hyper-Heuristic
-        problem = ProblemDomain(self.main_distanceMatrix)
-        hyperH = ChoiceFunctionGreatDeluge()
-        
-        # Check if time limit or iteration checked
-        if self.timeLimitCheckbox.isChecked():
-            time_limit = float(self.timeLimitInput.text())
-            hyperH.setTimeLimit(time_limit)
-        elif self.iterationCheckBox.isChecked():
-            iteration_limit = int(self.iterationLimitInput.text())
-            hyperH.setMaxIteration(iteration_limit)
+            # Initialise ProblemDomain and Hyper-Heuristic
+            problem = ProblemDomain(self.main_distanceMatrix)
+            hyperH = ChoiceFunctionGreatDeluge()
+            
+            # Check if time limit or iteration checked
+            if self.timeLimitCheckbox.isChecked():
+                time_limit = float(self.timeLimitInput.text())
+                hyperH.setTimeLimit(time_limit)
+            elif self.iterationCheckBox.isChecked():
+                iteration_limit = int(self.iterationLimitInput.text())
+                hyperH.setMaxIteration(iteration_limit)
 
-        # Set the initialization
-        current_initialization = self.solution_initialize_comboBox.currentText()
-        hyperH.setInitialSolution(current_initialization)
+            # Set the initialization
+            current_initialization = self.solution_initialize_comboBox.currentText()
+            hyperH.setInitialSolution(current_initialization)
 
-        # Great Deluge decay parameters
-        gd_decay_type = self.gd_waterLevel_label_comboBox.currentText()
-        hyperH.setDeacyModel(gd_decay_type)
-        gd_decay_rate = float(self.gd_decayRate_input.text())
-        hyperH.setDecayRate(gd_decay_rate)
+            # Great Deluge decay parameters
+            gd_decay_type = self.gd_waterLevel_label_comboBox.currentText()
+            hyperH.setDeacyModel(gd_decay_type)
+            gd_decay_rate = float(self.gd_decayRate_input.text())
+            hyperH.setDecayRate(gd_decay_rate)
 
-        # Choice Function parameters
-        phi = float(self.cf_phi_input.text())
-        delta = float(self.cf_delta_input.text())
-        hyperH.setPhiDelta_CF(phi, delta)
+            # Choice Function parameters
+            phi = float(self.cf_phi_input.text())
+            delta = float(self.cf_delta_input.text())
+            hyperH.setPhiDelta_CF(phi, delta)
 
-        # Heuristic Selections
-        hyperH.isCrossoverAllowed(self.crossover_checkBox.isChecked())
-        hyperH.setSelectedHeuristic(self.heuristicDialog.selections)
-        #print(self.heuristicDialog.selections)
+            # Heuristic Selections
+            hyperH.isCrossoverAllowed(self.crossover_checkBox.isChecked())
+            hyperH.setSelectedHeuristic(self.heuristicDialog.selections)
+            #print(self.heuristicDialog.selections)
 
-        hyperH.solve(problem)
-        #solution = problem.getBestSolution()
-        self.solution_steps = hyperH.all_solution_step
-        #print(len(self.solution_steps))
-        self.logEntries = hyperH.tsp_log.log_entries
-        #print(self.logEntries[0])
-        
-        # Start animation
-        self.canvas.start_animation(self.solution_steps, self.main_coordinates)
-        self.current_frame = 0
-        self.animation_timer.start(300) # Update every 300ms
-        
-        # Plot objective value graph
-        self.objectiveValue_canvas.plotObjectiveValue(hyperH.all_Objective_value, problem.init_solution_value, problem.getBestSolutionValue())
-        self.objectiveValue_canvas.draw_idle()
+            hyperH.solve(problem)
+            #solution = problem.getBestSolution()
+            self.solution_steps = hyperH.all_solution_step
+            #print(len(self.solution_steps))
+            self.logEntries = hyperH.tsp_log.log_entries
+            #print(self.logEntries[0])
 
-        # Plot Great Deluge water level graph
-        self.gdWaterValue_canvas.plotWaterValue(hyperH.all_waterLevelChange)
-        self.gdWaterValue_canvas.draw_idle()
+            self.solvingLabel.setText("Solving...")
+            self.startButton.setEnabled(False)
+            
+            # Start animation
+            self.canvas.start_animation(self.solution_steps, self.main_coordinates)
+            self.current_frame = 0
+            self.animation_timer.start(300) # Update every 300ms
+            
+            # Plot objective value graph
+            self.objectiveValue_canvas.plotObjectiveValue(hyperH.all_Objective_value, problem.init_solution_value, problem.getBestSolutionValue())
+            self.objectiveValue_canvas.draw_idle()
 
-        # Plot Histogram of heuristic usage
-        heuristicNames = problem.getHeuristicNames()
-        heuristicCount = problem.getHeuristicCounts()
+            # Plot Great Deluge water level graph
+            self.gdWaterValue_canvas.plotWaterValue(hyperH.all_waterLevelChange)
+            self.gdWaterValue_canvas.draw_idle()
 
-        self.histogram_canvas.plotHistogram(heuristicNames, heuristicCount)
-        self.histogram_canvas.draw_idle()
+            # Plot Histogram of heuristic usage
+            heuristicNames = problem.getHeuristicNames()
+            heuristicCount = problem.getHeuristicCounts()
+
+            self.histogram_canvas.plotHistogram(heuristicNames, heuristicCount)
+            self.histogram_canvas.draw_idle()
 
 
-        #except Exception as e:
-        #    QMessageBox.information(self, "Error - Unable to Start",
-        #                            f'Please Ensure Correct Values are Entered: \n{str(e)}')
-        #    return
+        except Exception as e:
+            QMessageBox.information(self, "Error - Unable to Start",
+                                    f'Please Ensure Correct Values are Entered: \n{str(e)}')
+            self.animation_timer.stop()
+            self.finalLog()
+            self.solvingLabel.setText("")
+            self.startButton.setEnabled(True)
+            return
         
 
     def updateAnimationStep(self):
